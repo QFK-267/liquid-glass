@@ -1,0 +1,17 @@
+{
+  "name": "liquid-glass-webgl-port",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "description": "把 martin65536/liquid-glass-webgl 的渲染管线封装成可直接使用的液态玻璃库",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QFK-267/liquid-glass.git"
+  },
+  "homepage": "https://github.com/QFK-267/liquid-glass",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

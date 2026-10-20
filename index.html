@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LiquidGlass Playground — DOM 控件液态玻璃</title>
+<style>
+  :root{
+    --text:#f6f7fb; --muted:rgba(246,247,251,.66); --line:rgba(255,255,255,.18);
+    /* 跟渲染器的 Canvas2D 字体栈保持一致，文字折射时才不会两套字形 */
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,
+           "PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+  .page{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:44px 24px 120px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.4px;font-weight:700}
+  h1{text-shadow:0 2px 14px rgba(0,0,0,.55)}
+  .sub{text-shadow:0 1px 10px rgba(0,0,0,.5)}
+  h1 small{font-size:13px;font-weight:400;color:var(--muted);margin-left:10px}
+  .sub{margin:0 0 26px;color:var(--muted);font-size:14px;line-height:1.7}
+  code{background:rgba(255,255,255,.10);padding:1px 6px;border-radius:6px;font-size:12.5px}
+
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:24px;align-items:start}
+  @media (max-width:960px){.layout{grid-template-columns:1fr}}
+
+  .stage{position:relative;min-height:560px;border-radius:34px;padding:28px}
+  .stage-hint{position:absolute;left:28px;bottom:16px;font-size:12px;color:var(--muted)}
+
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:20px}
+  .name{font-size:13px;color:var(--muted);min-width:62px}
+
+  .pill{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:999px;font-size:15px;cursor:pointer;
+        user-select:none}
+  .circle{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;
+          cursor:pointer;user-select:none}
+  .wide{font-size:13.5px;padding:13px 22px;letter-spacing:.2px}
+  .card{width:100%;max-width:430px;padding:22px 24px;border-radius:30px}
+  .card h3{margin:0 0 6px;font-size:17px}
+  .card p{margin:0;font-size:13px;color:var(--muted);line-height:1.65}
+
+  .square{position:absolute;width:180px;height:180px;border-radius:42px;display:flex;align-items:center;
+          justify-content:center;font-size:13px;color:rgba(255,255,255,.9);cursor:grab;touch-action:none;
+          user-select:none;text-align:center;line-height:1.5}
+  .square:active{cursor:grabbing}
+
+  .cursor-dot{position:fixed;left:0;top:0;width:74px;height:74px;border-radius:50%;pointer-events:none;
+              display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.7);
+              z-index:2}
+
+  /* 点击不要虚线框 / 移动端蓝色高亮；键盘用户仍然看得见焦点 */
+  button,select,input,label,a,[data-liquid-glass]{outline:none;-webkit-tap-highlight-color:transparent}
+  button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{
+    outline:none;box-shadow:0 0 0 2px rgba(255,255,255,.55),0 0 0 4px rgba(17,17,17,.35);border-radius:inherit
+  }
+
+  /* 选中反馈：不再用烦人的虚线框，改成点一下扩散淡出的柔光环 */
+  @keyframes lg-sel-pulse{
+    from{outline-color:rgba(255,255,255,.85);outline-offset:1px}
+    to  {outline-color:rgba(255,255,255,0);outline-offset:9px}
+  }
+  /* 两条规则同权重，必须放在 outline:none 之后才生效 */
+  [data-liquid-glass].sel{outline:2px solid transparent;animation:lg-sel-pulse .6s ease-out forwards}
+
+  .sheet{padding:20px 20px 24px;border-radius:28px}
+  .sheet h2{margin:0 0 4px;font-size:15px;font-weight:600}
+  .sheet .tip{margin:0 0 16px;font-size:12px;color:var(--muted);line-height:1.6}
+  .target{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .target button{flex:1 1 auto;padding:8px 10px;border-radius:12px;font-size:12.5px;color:var(--text);
+                 border:1px solid var(--line);background:rgba(255,255,255,.06);cursor:pointer}
+  .target button.on{background:rgba(255,255,255,.92);color:#111;border-color:transparent}
+  select{width:100%;background:rgba(255,255,255,.08);color:inherit;border:1px solid var(--line);
+         border-radius:8px;padding:5px 6px;font-size:12px}
+  option{color:#111}
+  .group{margin:14px 0 6px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .ctrl{display:grid;grid-template-columns:74px 1fr 46px;gap:10px;align-items:center;margin:9px 0}
+  .ctrl label{font-size:12.5px;color:var(--muted)}
+  .ctrl .val{font-size:11.5px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+                    background:rgba(255,255,255,.24);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+                    background:#fff;cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:#fff;cursor:pointer}
+  input[type=color]{-webkit-appearance:none;appearance:none;width:100%;height:22px;padding:0;border:0;
+                    background:none;cursor:pointer}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+  input[type=color]::-webkit-color-swatch{border:1px solid var(--line);border-radius:6px}
+  .check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin:8px 0 2px;cursor:pointer}
+  .check input{accent-color:#fff}
+  .actions{display:flex;gap:10px;margin-top:18px}
+  .actions button{flex:1;padding:10px;border-radius:14px;border:1px solid var(--line);
+                  background:rgba(255,255,255,.07);color:var(--text);font-size:13px;cursor:pointer}
+  .actions button:active{transform:scale(.98)}
+
+  .toast{position:fixed;left:50%;bottom:30px;transform:translate(-50%,16px);opacity:0;z-index:9;
+         padding:11px 20px;border-radius:999px;font-size:13.5px;pointer-events:none;transition:.28s}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  body.hide-cursor-glass .cursor-dot{display:none}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <h1>LiquidGlass Playground<small>任意 DOM 控件 → 同形状液态玻璃</small></h1>
+  <p class="sub">
+    画布负责在元素背后画玻璃，元素本身（文字、图标、事件）保持原样。<b>形状不用指定</b>：
+    圆角自动读 <code>border-radius</code>，胶囊/圆形自动识别。<b>文字会被玻璃折射 / 模糊 / 拉伸</b> ——
+    它和壁纸一样是「场景内容」，所以玻璃盖上去的时候是浸在里面的，不是浮在上面的贴纸。
+    右边滑杆实时改参数，点元素选中它，空白处点一下改全部。
+  </p>
+
+  <div class="layout">
+    <!-- ============ 舞台 ============ -->
+    <div class="stage" id="stage"
+         data-liquid-glass='{"radius":34,"blur":0,"refractionHeightFraction":0.05,"refractionAmountFraction":0.06,"independentBackdrop":true,"keepLook":true}'>
+      <div class="row">
+        <span class="name">按钮</span>
+        <div class="pill" data-liquid-glass='{"interactive":true}'>✈︎ 发送</div>
+        <div class="pill" data-liquid-glass='{"interactive":true,"preset":"chromatic"}'>色散</div>
+        <div class="circle" data-liquid-glass='{"shape":"circle","interactive":true}'>★</div>
+        <div class="circle" data-liquid-glass='{"shape":"circle","interactive":true,"preset":"liquid"}'>♪</div>
+      </div>
+
+      <div class="row">
+        <span class="name">开关</span>
+        <!-- 纯 DOM 开关：轨道 + 滑块，两块玻璃都自动跟随（滑块有弹性回弹） -->
+        <div class="track" id="track" data-liquid-glass='{"shape":"capsule","interactive":true,"blur":0,"refractionAmountFraction":0.34,"refractionHeightFraction":0.4}'
+             style="width:66px;height:38px;position:relative;cursor:pointer">
+          <div class="knob" id="knob" data-liquid-glass='{"shape":"capsule","interactive":true,"blur":0,"refractionAmountFraction":0.5,"refractionHeightFraction":0.5,"surfaceColor":"rgba(255,255,255,0.12)","highlight":{"alpha":0.75}}'
+               style="position:absolute;top:4px;left:4px;width:30px;height:30px;transition:transform .32s cubic-bezier(.34,1.56,.64,1)"></div>
+        </div>
+        <span class="name">文字</span>
+        <!-- 文字始终在玻璃之上：玻璃只画在这行字的背后 -->
+        <div class="pill wide" data-liquid-glass='{"interactive":true,"blur":0,"refractionAmountFraction":0.5}'>
+          文字浸在玻璃里 · text refracts
+        </div>
+      </div>
+
+      <div class="card" id="card" data-liquid-glass='{"blur":0,"refractionHeightFraction":0.34,"refractionAmountFraction":0.46,"saturation":1.2}'>
+        <h3>卡片也是玻璃</h3>
+        <p>拖动右边的滑杆，这块玻璃会立即变形。圆角、模糊、折射、染色全部来自原仓库的同一套 WebGL 管线；
+           卡片里的文字会被这块玻璃折射 —— 关掉右边「文字折射」就会变回普通的清晰文字。</p>
+      </div>
+
+      <!-- 游乐场方块：可拖动 / 滚轮缩放 / 滑杆旋转 / 自动漂浮 -->
+      <div class="square" id="square" data-liquid-glass='{"preset":"liquid","interactive":true,"radiusFraction":0.35}'
+           style="left:430px;top:328px">拖我<br>滚轮缩放</div>
+
+      <div class="stage-hint">点击选中一个控件 → 用右侧滑杆调它的玻璃参数；按钮按住不放有按压动画</div>
+    </div>
+
+    <!-- ============ 参数面板（自己也是玻璃） ============ -->
+    <aside class="sheet" data-liquid-glass='{"radius":28,"blur":0,"refractionHeightFraction":0.09,"refractionAmountFraction":0.12,"independentBackdrop":false,"animateIn":false,"keepLook":true,"refractText":false}'>
+      <h2>参数</h2>
+      <p class="tip">当前目标：<b id="targetName">全部控件</b></p>
+
+      <div class="ctrl" style="grid-template-columns:74px 1fr"><label>预设</label>
+        <select id="preset">
+          <option value="clear">通透（默认）</option>
+          <option value="liquid">液态</option>
+          <option value="frosted">磨砂</option>
+          <option value="heavy">厚重</option>
+          <option value="chromatic">色散</option>
+        </select><span class="val"></span></div>
+
+      <div class="target" id="targetBtns">
+        <button class="on" data-target="all">全部</button>
+        <button data-target="square">方块</button>
+        <button data-target="card">卡片</button>
+      </div>
+
+      <div class="group">形状 / 光学</div>
+      <label class="check"><input type="checkbox" id="followCss" checked> 跟随 CSS 圆角</label>
+      <div class="ctrl"><label>圆角</label><input type="range" id="radiusFraction" min="0" max="1" step="0.01" value="0.35"><span class="val" id="v-radiusFraction">0.35</span></div>
+      <div class="ctrl"><label>模糊</label><input type="range" id="blur" min="0" max="30" step="0.5" value="0"><span class="val" id="v-blur">0</span></div>
+      <div class="ctrl"><label>折射宽度</label><input type="range" id="refractionHeightFraction" min="0" max="0.6" step="0.01" value="0.3"><span class="val" id="v-refractionHeightFraction">0.30</span></div>
+      <div class="ctrl"><label>折射强度</label><input type="range" id="refractionAmountFraction" min="0" max="0.8" step="0.01" value="0.42"><span class="val" id="v-refractionAmountFraction">0.42</span></div>
+      <div class="ctrl"><label>不透明度</label><input type="range" id="opacity" min="0" max="1" step="0.01" value="1"><span class="val" id="v-opacity">1</span></div>
+      <label class="check"><input type="checkbox" id="chromaticAberration"> 色散</label>
+      <label class="check"><input type="checkbox" id="depthEffect" checked> 纵深折射</label>
+      <label class="check"><input type="checkbox" id="sceneSample"> 玻璃叠玻璃（采样场景，更糊）</label>
+
+      <div class="group">颜色</div>
+      <div class="ctrl"><label>染色</label><input type="color" id="tintColor" value="#7f5af0"><span class="val" id="v-tintColor">0%</span></div>
+      <div class="ctrl"><label>染色量</label><input type="range" id="tintAlpha" min="0" max="1" step="0.01" value="0"><span class="val" id="v-tintAlpha">0.00</span></div>
+      <div class="ctrl"><label>表面色</label><input type="color" id="surfaceColor" value="#ffffff"><span class="val" id="v-surfaceColor">0%</span></div>
+      <div class="ctrl"><label>表面量</label><input type="range" id="surfaceAlpha" min="0" max="1" step="0.01" value="0"><span class="val" id="v-surfaceAlpha">0.00</span></div>
+      <div class="ctrl"><label>饱和度</label><input type="range" id="saturation" min="0" max="2.5" step="0.01" value="1.15"><span class="val" id="v-saturation">1.15</span></div>
+      <div class="ctrl"><label>亮度</label><input type="range" id="brightness" min="-0.5" max="0.5" step="0.01" value="0"><span class="val" id="v-brightness">0.00</span></div>
+      <div class="ctrl"><label>对比度</label><input type="range" id="contrast" min="0.5" max="2" step="0.01" value="1.03"><span class="val" id="v-contrast">1.03</span></div>
+
+      <div class="group">边缘 / 阴影</div>
+      <div class="ctrl"><label>高光模式</label><input type="range" id="hlMode" min="0" max="2" step="1" value="0"><span class="val" id="v-hlMode">0</span></div>
+      <div class="ctrl"><label>高光强度</label><input type="range" id="hlAlpha" min="0" max="1" step="0.01" value="0.6"><span class="val" id="v-hlAlpha">0.60</span></div>
+      <div class="ctrl"><label>高光角度</label><input type="range" id="hlAngle" min="0" max="360" step="1" value="45"><span class="val" id="v-hlAngle">45</span></div>
+      <div class="ctrl"><label>投影强度</label><input type="range" id="shAlpha" min="0" max="0.6" step="0.01" value="0.22"><span class="val" id="v-shAlpha">0.22</span></div>
+
+      <div class="group">变换</div>
+      <div class="ctrl"><label>旋转</label><input type="range" id="rotation" min="-180" max="180" step="1" value="0"><span class="val" id="v-rotation">0</span></div>
+      <div class="ctrl"><label>缩放</label><input type="range" id="scale" min="0.4" max="1.8" step="0.01" value="1"><span class="val" id="v-scale">1.00</span></div>
+
+      <div class="group">动画 / 文字</div>
+      <label class="check"><input type="checkbox" id="refractText" checked> 文字折射（沉浸模式）</label>
+      <label class="check"><input type="checkbox" id="animateIn" checked> 入场动画（弹簧淡入 + 微缩放）</label>
+      <label class="check"><input type="checkbox" id="interactive" checked> 按压动画（弹簧缩放 + 手指高光）</label>
+      <label class="check"><input type="checkbox" id="floatOn" checked> 方块自动漂浮（DOM 动，玻璃跟）</label>
+      <label class="check"><input type="checkbox" id="cursorGlass" checked> 鼠标跟随玻璃</label>
+      <label class="check"><input type="checkbox" id="animWallpaper"> 动态光斑壁纸</label>
+      <div class="actions"><button id="replay">重播入场动画</button></div>
+
+      <div class="group">全局</div>
+      <div class="ctrl"><label>壁纸</label>
+        <select id="wallpaper">
+          <option value="image">图片（静态）</option>
+          <option value="gradient">渐变</option>
+          <option value="color">纯色</option>
+          <option value="anim">动态光斑</option>
+        </select><span class="val"></span></div>
+      <div class="ctrl"><label>DPR</label><input type="range" id="dpr" min="0.75" max="3" step="0.25" value="2"><span class="val" id="v-dpr">2</span></div>
+      <div class="ctrl"><label>模糊降采样</label><input type="range" id="blurDownsample" min="1" max="4" step="1" value="2"><span class="val" id="v-blurDownsample">2</span></div>
+      <label class="check"><input type="checkbox" id="useKawaseBlur" checked> Kawase 模糊</label>
+      <label class="check"><input type="checkbox" id="usePerElementFbo" checked> 每元素 FBO（更快）</label>
+
+      <div class="actions">
+        <button id="reset">重置参数</button>
+        <button id="fps">–</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="cursor-dot" id="cursorDot" data-liquid-glass='{"shape":"circle","preset":"liquid","interactive":false,"animateIn":false}'></div>
+<div class="toast" id="toast" data-liquid-glass='{"shape":"capsule","blur":10}'></div>
+
+<script src="./dist/liquid-glass.js"></script>
+<script>
+/* ===========================================================================
+ * 页面脚本 —— 只用 class 的公开 API，不碰渲染器内部
+ *
+ *   const glass = new LiquidGlass({...})      建实例（自动铺满视口的 canvas）
+ *   glass.scan()                              把 [data-liquid-glass] 全登记成玻璃
+ *   glass.update(el, { ...参数 })             改一个元素的参数
+ *   glass.updateAll({ ...参数 })              改所有元素（keepLook 的会跳过）
+ *   glass.setPreset('liquid', el?)            换预设（不传 el = 全部）
+ *   glass.setParam('dpr', 1.5)               渲染器全局参数
+ *   glass.intro()                             重播入场动画
+ *   glass.paramsOf(el)  glass.get(el)  glass.remove(el)  glass.refresh()
+ *   glass.setWallpaper({type:'canvas',source,animate?}) / {type:'color',color} / 'url.jpg'
+ *   glass.start() / stop() / renderNow() / resize() / destroy()
+ *   glass.renderer                            原仓库渲染器（逃生口）
+ *
+ * 元素参数（shape / radius / blur / refractionAmountFraction / opacity / tintColor /
+ * interactive / animateIn / refractText / keepLook / preset ...）见 README.md，
+ * 或 dist/liquid-glass.js 顶部那段注释。
+ * =========================================================================== */
+(function () {
+  /* ---------------- 壁纸（现场生成，免素材） ---------------- */
+  // 网格线是刻意留的：折射强弱一眼可见（原仓库的游乐场也是这种可读纹理）。
+  function makeImageWallpaper(w, h) {
+    var cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    var g = cv.getContext('2d');
+    var grd = g.createLinearGradient(0, 0, w, h);
+    grd.addColorStop(0, '#0b1222'); grd.addColorStop(.38, '#3d2a68');
+    grd.addColorStop(.7, '#8d4356'); grd.addColorStop(1, '#c39a63');
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 40; i++) {
+      var x = (i * 977) % w, y = (i * 613) % h;
+      var r = 46 + ((i * 137) % 150);
+      var rg = g.createRadialGradient(x, y, 0, x, y, r);
+      var hue = (i * 41) % 360;
+      rg.addColorStop(0, 'hsla(' + hue + ',85%,60%,.38)');
+      rg.addColorStop(1, 'hsla(' + hue + ',92%,62%,0)');
+      g.fillStyle = rg; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill();
+    }
+    g.strokeStyle = 'rgba(255,255,255,.10)'; g.lineWidth = 1;
+    for (var x2 = 0; x2 < w; x2 += 36) { g.beginPath(); g.moveTo(x2, 0); g.lineTo(x2, h); g.stroke(); }
+    for (var y2 = 0; y2 < h; y2 += 36) { g.beginPath(); g.moveTo(0, y2); g.lineTo(w, y2); g.stroke(); }
+    return cv;
+  }
+
+  var animCanvas = document.createElement('canvas');
+  animCanvas.width = 900; animCanvas.height = 640;
+  function drawAnim(t) {
+    var w = animCanvas.width, h = animCanvas.height;
+    var g = animCanvas.getContext('2d');
+    g.fillStyle = '#07080f'; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 7; i++) {
+      var x = w * (0.5 + 0.42 * Math.cos(t * 0.00022 + i * 1.1));
+      var y = h * (0.5 + 0.42 * Math.sin(t * 0.00028 + i * 1.7));
+      var r = Math.min(w, h) * (0.20 + 0.06 * Math.sin(t * 0.0004 + i));
+      var rg = g.createRadialGradient(x, y, 0, x, y, r);
+      var hue = (i * 52 + t * 0.02) % 360;
+      rg.addColorStop(0, 'hsla(' + hue + ',95%,62%,.95)');
+      rg.addColorStop(1, 'hsla(' + hue + ',95%,62%,0)');
+      g.fillStyle = rg; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill();
+    }
+  }
+  drawAnim(0);
+
+  /* ---------------- 建立实例 ---------------- */
+  var glass = new LiquidGlass({
+    dpr: Math.min(window.devicePixelRatio || 1, 2),
+    preset: 'clear',
+    wallpaper: { type: 'canvas', source: makeImageWallpaper(1400, 1000) }
+  });
+  window.glass = glass;
+  glass.scan();
+
+  /* ---------------- 开关 / 方块交互 ---------------- */
+  var track = document.getElementById('track');
+  var knob = document.getElementById('knob');
+  track.addEventListener('click', function () {
+    var on = track.dataset.on !== '1';
+    track.dataset.on = on ? '1' : '0';
+    knob.style.transform = on ? 'translateX(28px)' : 'translateX(0)';
+  });
+
+  var square = document.getElementById('square');
+  var stageEl = document.getElementById('stage');
+  // bx/by = 漂浮轨迹的中心；拖动结束后把中心挪到拖动后的位置，漂浮就不会跟拖动打架
+  var sq = { x: 430, y: 328, bx: 430, by: 328, scale: 1, rotation: 0, drag: false, dx: 0, dy: 0, fx: 430, fy: 328, t: 0 };
+  // 注意：方块是 .stage 里的 absolute 元素，left/top 是相对 stage 的，
+  // 所以拖动的指针坐标要先减掉 stage 的偏移，否则一按下去就会跳。
+  square.addEventListener('pointerdown', function (e) {
+    var b = stageEl.getBoundingClientRect();
+    sq.drag = true;
+    sq.dx = e.clientX - b.left - sq.x;
+    sq.dy = e.clientY - b.top - sq.y;
+    try { square.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  square.addEventListener('pointermove', function (e) {
+    if (!sq.drag) return;
+    var b = stageEl.getBoundingClientRect();
+    sq.x = e.clientX - b.left - sq.dx;
+    sq.y = e.clientY - b.top - sq.dy;
+    square.style.left = sq.x + 'px'; square.style.top = sq.y + 'px';
+  });
+  square.addEventListener('pointerup', function () {
+    sq.drag = false;
+    sq.bx = sq.x - Math.sin(sq.t * 0.00042) * 96;
+    sq.by = sq.y - Math.cos(sq.t * 0.00061) * 58;
+  });
+  square.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    sq.scale = Math.max(0.5, Math.min(2, sq.scale * (e.deltaY > 0 ? 0.96 : 1.04)));
+    applyTransform();
+  }, { passive: false });
+  function applyTransform() {
+    square.style.transform = 'scale(' + sq.scale + ') rotate(' + sq.rotation + 'deg)';
+  }
+
+  /* ---------------- 选中目标 ---------------- */
+  var selected = null; // null = 全部
+  var els = glass.records.map(function (r) { return r.el; });
+  document.addEventListener('pointerdown', function (e) {
+    var el = e.target.closest && e.target.closest('.lg-glass');
+    if (!el || el.classList.contains('lg-canvas')) return;
+    if (el.closest('.sheet') || el === square) return; // 面板/方块用按钮或滑杆选
+    selected = el;
+    refreshPanel();
+    markSelection();
+  });
+  document.querySelectorAll('#targetBtns button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.getAttribute('data-target');
+      selected = t === 'all' ? null : document.getElementById(t);
+      refreshPanel(); markSelection();
+    });
+  });
+  function markSelection() {
+    els.forEach(function (el) {
+      el.classList.remove('sel');
+      if (el === selected) {
+        void el.offsetWidth;      // 重启动画：点同一个元素也会再亮一下
+        el.classList.add('sel');
+      }
+    });
+    document.getElementById('targetName').textContent =
+      !selected ? '全部控件' : (selected.id || selected.className.split(' ')[0]);
+    document.querySelectorAll('#targetBtns button').forEach(function (x) {
+      x.classList.toggle('on', x.getAttribute('data-target') === (selected ? selected.id : 'all'));
+    });
+  }
+
+  /* ---------------- 参数面板 ---------------- */
+  // 面板滑杆写的都是「比例」（跟原仓库的 GlassPlayground 一样），
+  // 这样大卡片和小胶囊的折射强度观感一致，也能被预设整体替换。
+  var LOOK_DEFAULT = {
+    radiusFraction: 0.35, blur: 0, refractionHeightFraction: 0.3, refractionAmountFraction: 0.42,
+    opacity: 1, chromaticAberration: false, depthEffect: true, sceneSample: false,
+    tintColor: '#7f5af0', tintAlpha: 0, surfaceColor: '#ffffff', surfaceAlpha: 0,
+    saturation: 1.15, brightness: 0, contrast: 1.03,
+    hlMode: 0, hlAlpha: 0.6, hlAngle: 45, shAlpha: 0.22,
+    rotation: 0, scale: 1, dpr: 2, blurDownsample: 2
+  };
+  var ui = Object.assign({}, LOOK_DEFAULT);
+  var followCss = true;
+  var animState = { animateIn: true, interactive: true, refractText: true };
+
+  function hexToRgba(hex, a) {
+    var n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function toParams() {
+    var p = {
+      blur: ui.blur,
+      refractionHeight: null,
+      refractionHeightFraction: ui.refractionHeightFraction,
+      refractionAmount: null,
+      refractionAmountFraction: ui.refractionAmountFraction,
+      opacity: ui.opacity,
+      chromaticAberration: ui.chromaticAberration,
+      depthEffect: ui.depthEffect,
+      independentBackdrop: !ui.sceneSample,
+      directSample: false,
+      saturation: ui.saturation,
+      brightness: ui.brightness,
+      contrast: ui.contrast,
+      rotation: ui.rotation,
+      scale: ui.scale,
+      innerShadow: null
+    };
+    p.radiusFraction = followCss ? null : ui.radiusFraction;
+    p.tintColor = ui.tintAlpha > 0 ? hexToRgba(ui.tintColor, ui.tintAlpha) : null;
+    p.surfaceColor = ui.surfaceAlpha > 0 ? hexToRgba(ui.surfaceColor, ui.surfaceAlpha) : null;
+    p.highlight = ui.hlAlpha > 0 ? { mode: ui.hlMode, alpha: ui.hlAlpha, angleDeg: ui.hlAngle, color: '#ffffff' } : false;
+    p.outerShadow = ui.shAlpha > 0 ? { alpha: ui.shAlpha, radius: 24, offsetY: 4, color: '#000000' } : false;
+    return p;
+  }
+
+  function applyParams() {
+    var p = toParams();
+    if (selected) glass.update(selected, p);
+    else glass.updateAll(p);
+  }
+
+  function bindRange(id, key, fmt, after) {
+    var input = document.getElementById(id);
+    var out = document.getElementById('v-' + id);
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var v = parseFloat(input.value);
+      ui[key] = v;
+      if (out) out.textContent = fmt ? fmt(v) : v;
+      if (after) after(v);
+      applyParams();
+      if (key === 'rotation' || key === 'scale') { sq.rotation = ui.rotation; sq.scale = ui.scale; applyTransform(); }
+    });
+    input._sync = function () {
+      input.value = ui[key];
+      if (out) out.textContent = fmt ? fmt(ui[key]) : ui[key];
+    };
+  }
+  var f2 = function (v) { return v.toFixed(2); };
+  bindRange('radiusFraction', 'radiusFraction', f2);
+  bindRange('blur', 'blur', String);
+  bindRange('refractionHeightFraction', 'refractionHeightFraction', f2);
+  bindRange('refractionAmountFraction', 'refractionAmountFraction', f2);
+  bindRange('opacity', 'opacity', f2);
+  bindRange('tintAlpha', 'tintAlpha', f2);
+  bindRange('surfaceAlpha', 'surfaceAlpha', f2);
+  bindRange('saturation', 'saturation', f2);
+  bindRange('brightness', 'brightness', f2);
+  bindRange('contrast', 'contrast', f2);
+  bindRange('hlMode', 'hlMode', String);
+  bindRange('hlAlpha', 'hlAlpha', f2);
+  bindRange('hlAngle', 'hlAngle', String);
+  bindRange('shAlpha', 'shAlpha', f2);
+  bindRange('rotation', 'rotation', String);
+  bindRange('scale', 'scale', f2);
+  bindRange('dpr', 'dpr', String, function (v) { glass.setParam('dpr', v); glass.resize(); });
+  bindRange('blurDownsample', 'blurDownsample', String, function (v) { glass.setParam('blurDownsample', v); });
+
+  function bindCheck(id, key, onChange) {
+    var input = document.getElementById(id);
+    input.addEventListener('change', function () {
+      if (key) ui[key] = input.checked;
+      if (onChange) onChange(input.checked);
+      applyParams();
+    });
+    input._sync = function () { input.checked = !!ui[key]; };
+  }
+  bindCheck('chromaticAberration', 'chromaticAberration');
+  bindCheck('depthEffect', 'depthEffect');
+  bindCheck('sceneSample', 'sceneSample');
+  bindCheck('useKawaseBlur', null, function (v) { glass.setParam('useKawaseBlur', v); });
+  bindCheck('usePerElementFbo', null, function (v) { glass.setParam('usePerElementFbo', v); });
+  document.getElementById('followCss').addEventListener('change', function () {
+    followCss = this.checked; applyParams();
+  });
+  document.getElementById('tintColor').addEventListener('input', function () { ui.tintColor = this.value; applyParams(); });
+  document.getElementById('surfaceColor').addEventListener('input', function () { ui.surfaceColor = this.value; applyParams(); });
+
+  /* ---------------- 预设 ---------------- */
+  var presetSel = document.getElementById('preset');
+  presetSel.addEventListener('change', function () {
+    var name = this.value;
+    glass.setPreset(name, selected || null);
+    // 预设改了「观感参数」，把面板同步回该预设的真实值
+    syncPanelFrom(name);
+    applyParams();
+    toast('预设：' + this.options[this.selectedIndex].text);
+  });
+
+  function syncPanelFrom(presetName) {
+    var preset = LiquidGlass.PRESETS[presetName];
+    if (!preset) return;
+    var d = preset.params;
+    Object.assign(ui, LOOK_DEFAULT);
+    if (typeof d.blur === 'number') ui.blur = d.blur;
+    if (typeof d.refractionHeightFraction === 'number') ui.refractionHeightFraction = d.refractionHeightFraction;
+    if (typeof d.refractionAmountFraction === 'number') ui.refractionAmountFraction = d.refractionAmountFraction;
+    if (typeof d.saturation === 'number') ui.saturation = d.saturation;
+    if (typeof d.brightness === 'number') ui.brightness = d.brightness;
+    if (typeof d.contrast === 'number') ui.contrast = d.contrast;
+    ui.chromaticAberration = !!d.chromaticAberration;
+    ui.depthEffect = !!d.depthEffect;
+    ui.hlMode = d.highlight && d.highlight.mode != null ? d.highlight.mode : 0;
+    ui.hlAlpha = d.highlight && d.highlight.alpha != null ? d.highlight.alpha : 0.42;
+    ui.shAlpha = d.outerShadow && d.outerShadow.alpha != null ? d.outerShadow.alpha : 0.12;
+    ui.sceneSample = false;
+    ui.tintAlpha = 0; ui.surfaceAlpha = 0;
+    syncInputs();
+  }
+
+  /** 把选中元素的真实参数读回面板。 */
+  function refreshPanel() {
+    if (selected) {
+      var p = glass.paramsOf(selected) || {};
+      if (typeof p.preset === 'string' && LiquidGlass.PRESETS[p.preset]) syncPanelFrom(p.preset);
+      followCss = !(typeof p.radiusFraction === 'number');
+      document.getElementById('followCss').checked = followCss;
+      ui.radiusFraction = typeof p.radiusFraction === 'number' ? p.radiusFraction : ui.radiusFraction;
+      ['blur', 'refractionHeightFraction', 'refractionAmountFraction', 'opacity', 'saturation',
+       'brightness', 'contrast', 'rotation', 'scale'].forEach(function (k) {
+        if (typeof p[k] === 'number') ui[k] = p[k];
+      });
+      ui.chromaticAberration = !!p.chromaticAberration;
+      ui.depthEffect = !!p.depthEffect;
+      ui.sceneSample = !p.independentBackdrop;
+      if (p.highlight && p.highlight !== false) {
+        ui.hlAlpha = p.highlight.alpha != null ? p.highlight.alpha : 0.42;
+        ui.hlMode = p.highlight.mode != null ? p.highlight.mode : 0;
+        ui.hlAngle = p.highlight.angleDeg != null ? p.highlight.angleDeg : 45;
+      }
+      if (p.tintColor) { var c = parseColor(p.tintColor); ui.tintColor = rgbToHex(c); ui.tintAlpha = c[3]; }
+      else ui.tintAlpha = 0;
+      if (p.surfaceColor) { var c2 = parseColor(p.surfaceColor); ui.surfaceColor = rgbToHex(c2); ui.surfaceAlpha = c2[3]; }
+      else ui.surfaceAlpha = 0;
+      ui.shAlpha = p.outerShadow && p.outerShadow !== false ? p.outerShadow.alpha : 0;
+      presetSel.value = p.preset && LiquidGlass.PRESETS[p.preset] ? p.preset : presetSel.value;
+      animState.interactive = !!p.interactive;
+      animState.animateIn = p.animateIn !== false;
+      animState.refractText = p.refractText !== false;
+    } else {
+      Object.assign(ui, LOOK_DEFAULT);
+      followCss = true;
+      document.getElementById('followCss').checked = true;
+      animState.interactive = true;
+      animState.animateIn = true;
+      animState.refractText = true;
+    }
+    document.getElementById('interactive').checked = animState.interactive;
+    document.getElementById('animateIn').checked = animState.animateIn;
+    document.getElementById('refractText').checked = animState.refractText;
+    syncInputs();
+  }
+  function syncInputs() {
+    document.querySelectorAll('input[type=range]').forEach(function (i) { if (i._sync) i._sync(); });
+    document.querySelectorAll('input[type=checkbox]').forEach(function (i) { if (i._sync) i._sync(); });
+    document.getElementById('tintColor').value = ui.tintColor;
+    document.getElementById('surfaceColor').value = ui.surfaceColor;
+  }
+  function rgbToHex(c) {
+    var f = function (v) { var s = Math.round(v * 255).toString(16); return s.length < 2 ? '0' + s : s; };
+    return '#' + f(c[0]) + f(c[1]) + f(c[2]);
+  }
+
+  /* ---------------- 动画控制 ---------------- */
+  document.getElementById('animateIn').addEventListener('change', function () {
+    var on = this.checked;
+    glass.setParam('animateIn', on);
+    glass.records.forEach(function (r) { r.params.animateIn = on; });
+    if (on) glass.intro();
+  });
+  document.getElementById('interactive').addEventListener('change', function () {
+    var on = this.checked;
+    if (selected) glass.update(selected, { interactive: on });
+    else glass.updateAll({ interactive: on });
+    glass.records.forEach(function (r) { r.key = ''; });
+  });
+  document.getElementById('refractText').addEventListener('change', function () {
+    var on = this.checked;
+    glass.setParam('refractText', on);
+    glass.updateAll({ refractText: on });
+    // 玻璃要重新决定采样壁纸还是采样场景
+    glass.records.forEach(function (r) { r.key = ''; });
+    toast(on ? '文字折射：开' : '文字折射：关（文字回到玻璃之上）');
+  });
+  document.getElementById('replay').addEventListener('click', function () {
+    glass.setParam('animateIn', true);
+    glass.records.forEach(function (r) { r.params.animateIn = true; });
+    glass.intro();
+    toast('重播入场动画');
+  });
+  var floatOn = true;
+  document.getElementById('floatOn').addEventListener('change', function () { floatOn = this.checked; });
+
+  var cursorGlass = true;
+  var dot = document.getElementById('cursorDot');
+  var cur = { x: -300, y: -300, sx: -300, sy: -300 };
+  document.getElementById('cursorGlass').addEventListener('change', function () {
+    cursorGlass = this.checked;
+    document.body.classList.toggle('hide-cursor-glass', !cursorGlass);
+    dot.style.display = cursorGlass ? 'flex' : 'none';
+  });
+  window.addEventListener('pointermove', function (e) { cur.x = e.clientX; cur.y = e.clientY; cur.has = true; });
+
+  /* ---------------- 壁纸切换 ---------------- */
+  var animOn = false;
+  function setWallpaperValue(v) {
+    if (v === 'image') glass.setWallpaper({ type: 'canvas', source: makeImageWallpaper(1400, 1000) });
+    else if (v === 'gradient') glass.setWallpaper({ type: 'color', color: '#1b2a49' });
+    else if (v === 'color') glass.setWallpaper({ type: 'color', color: '#101318' });
+    else if (v === 'anim') glass.setWallpaper({ type: 'canvas', source: animCanvas, animate: true });
+    animOn = v === 'anim';
+    document.getElementById('animWallpaper').checked = animOn;
+    document.getElementById('wallpaper').value = v;
+  }
+  document.getElementById('wallpaper').addEventListener('change', function () {
+    setWallpaperValue(this.value);
+    toast('壁纸：' + this.options[this.selectedIndex].text);
+  });
+  document.getElementById('animWallpaper').addEventListener('change', function () {
+    setWallpaperValue(this.checked ? 'anim' : 'image');
+    toast(this.checked ? '动态光斑壁纸' : '静态壁纸');
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    Object.assign(ui, LOOK_DEFAULT);
+    followCss = true;
+    document.getElementById('followCss').checked = true;
+    if (selected) { var rec = glass.get(selected); if (rec) rec.params = {}; }
+    else glass.records.forEach(function (r) { r.params = {}; });
+    glass.refresh();
+    glass.setPreset(presetSel.value, selected || null);
+    syncPanelFrom(presetSel.value);
+    applyParams();
+    toast('已重置');
+  });
+
+  /* ---------------- 帧循环：漂浮 / 鼠标玻璃 / 动态壁纸 ---------------- */
+  (function loop(t) {
+    // 动态光斑：每帧重画源 canvas（渲染器每帧自动重传纹理）
+    if (animOn) drawAnim(t);
+
+    // 方块漂浮：直接改 DOM 的 left/top —— 玻璃每帧跟着 DOM 走
+    sq.t = t;
+    if (floatOn && !sq.drag) {
+      var bx = sq.bx + Math.sin(t * 0.00042) * 96;
+      var by = sq.by + Math.cos(t * 0.00061) * 58;
+      if (Math.abs(bx - sq.fx) > 0.2 || Math.abs(by - sq.fy) > 0.2) {
+        sq.fx = bx; sq.fy = by;
+        square.style.left = bx + 'px';
+        square.style.top = by + 'px';
+      }
+    }
+
+    // 鼠标跟随玻璃（阻尼跟随，展示玻璃实时贴 DOM）
+    if (cursorGlass) {
+      cur.sx += (cur.x - cur.sx - 37) * 0.16;
+      cur.sy += (cur.y - cur.sy - 37) * 0.16;
+      dot.style.transform = 'translate3d(' + cur.sx.toFixed(1) + 'px,' + cur.sy.toFixed(1) + 'px,0)';
+    }
+    requestAnimationFrame(loop);
+  })(0);
+
+  /* ---------------- FPS ---------------- */
+  var last = performance.now(), frames = 0, fps = 60;
+  var fpsBtn = document.getElementById('fps');
+  (function tick(t) {
+    frames++;
+    if (t - last > 500) { fps = Math.round((frames * 1000) / (t - last)); frames = 0; last = t; fpsBtn.textContent = fps + ' FPS'; }
+    requestAnimationFrame(tick);
+  })(0);
+
+  /* ---------------- toast ---------------- */
+  var toastEl = document.getElementById('toast'), toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 1500);
+  }
+
+  refreshPanel();
+  markSelection();
+})();
+</script>
+</body>
+</html>
