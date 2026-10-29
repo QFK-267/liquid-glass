@@ -1,7 +1,146 @@
-# LiquidGlass — 任意 DOM 控件的液态玻璃（WebGL）
+# LiquidGlass
 
-把 [martin65536/liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)（Apache-2.0）
-的 WebGL 渲染管线**原样搬过来**，加上一层 vanilla 宿主，做成一个可以直接 `<script>` 引入的库：
+**Turn any DOM element into beautiful liquid glass with pure WebGL.**
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-ready-blue)](./src)
+[![Demo](https://img.shields.io/badge/Live%20Demo-index.html-brightgreen)](./index.html)
+
+> Based on [martin65536/liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl) (Apache-2.0)  
+> Original inspiration: [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)
+
+![Preview](./preview.png)
+
+---
+
+## Why LiquidGlass?
+
+Most "glassmorphism" libraries just blur the background with CSS.  
+**LiquidGlass** is different:
+
+- Real **WebGL refraction**, chromatic aberration, depth effects
+- Automatically reads your element's `border-radius` (capsule / circle / rounded rect)
+- Text can be **refracted inside the glass** (not just floating on top)
+- Smooth spring animations (enter + press feedback)
+- Multiple presets: `clear` / `liquid` / `frosted` / `heavy` / `chromatic`
+- Drop-in: just add `data-liquid-glass` and one line of JS
+
+Perfect for modern UI, landing pages, dashboards, or just showing off.
+
+---
+
+## Quick Start
+
+```html
+<script src="./dist/liquid-glass.js"></script>
+
+<div class="btn" data-liquid-glass>Click me</div>
+
+<script>
+  const glass = new LiquidGlass({
+    wallpaper: './wallpaper.jpg'   // or a color / canvas / video
+  });
+  glass.scan();   // make every [data-liquid-glass] into liquid glass
+</script>
+```
+
+Or with options:
+
+```html
+<div data-liquid-glass='{"blur":12,"refractionAmount":50,"chromaticAberration":true}'>
+  Fancy glass
+</div>
+```
+
+ESM:
+
+```js
+import { LiquidGlass } from './dist/liquid-glass.esm.js';
+```
+
+---
+
+## Features
+
+| Feature | Description |
+|--------|-------------|
+| **Auto shape** | Reads CSS `border-radius` automatically |
+| **Text refraction** | Text gets distorted by the glass (immersive mode) |
+| **Spring animations** | Enter animation + press feedback with glow |
+| **Presets** | `clear` (default), `liquid`, `frosted`, `heavy`, `chromatic` |
+| **Full control** | Blur, refraction, tint, highlight, shadow, scale, rotation... |
+| **Glass stacking** | Optional true glass-over-glass refraction |
+| **Performance** | Dirty flag + auto sleep when idle |
+
+---
+
+## Live Demo
+
+Open [`index.html`](./index.html) for the full **Glass Playground**:
+
+- Drag, scale, rotate elements
+- Live parameter panel
+- Switch presets & wallpapers
+- FPS monitor
+
+Minimal example: [`examples/minimal.html`](./examples/minimal.html)
+
+---
+
+## Installation
+
+```bash
+npm install      # only needs esbuild for building
+npm run build    # generates dist/liquid-glass.js / .min.js / .esm.js
+```
+
+Or just download the files from `dist/` and use them directly.
+
+---
+
+## API Overview
+
+```js
+const glass = new LiquidGlass({
+  preset: 'clear',          // or 'liquid' | 'frosted' | 'heavy' | 'chromatic'
+  animateIn: true,
+  interactive: true,        // press animation
+  refractText: true,        // text goes through glass
+  wallpaper: './bg.jpg',
+  dpr: Math.min(devicePixelRatio, 2)
+});
+
+glass.scan();                         // auto-detect [data-liquid-glass]
+glass.add('#my-button', { blur: 8 });
+glass.update('#my-button', { tintColor: 'rgba(0,120,255,.3)' });
+glass.setPreset('liquid');
+glass.setWallpaper('#0a1628');
+```
+
+See the original Chinese README below or the source for the full parameter list.
+
+---
+
+## License
+
+Apache-2.0  
+Renderer / shaders / geometry algorithms belong to the upstream authors.  
+See [`NOTICE.md`](./NOTICE.md) for detailed attribution.
+
+---
+
+## Credits
+
+- Rendering pipeline: [martin65536/liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)
+- Original concept: [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)
+
+---
+
+<br>
+
+# 中文说明（完整版）
+
+把 [martin65536/liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl)（Apache-2.0）的 WebGL 渲染管线**原样搬过来**，加上一层 vanilla 宿主，做成一个可以直接 `<script>` 引入的库。
 
 ```html
 <script src="./dist/liquid-glass.js"></script>
@@ -12,56 +151,28 @@
 </script>
 ```
 
-> 上游项目：[martin65536/liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl) ·
-> 更上游：[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)（Kotlin/Compose）
+> 上游项目：[martin65536/liquid-glass-webgl](https://github.com/martin65536/liquid-glass-webgl) ·  
+> 更上游：[Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)（Kotlin/Compose）  
 > 许可证：Apache-2.0。渲染器 / 着色器 / G2 几何都是他们的代码，详见 [`NOTICE.md`](./NOTICE.md)。
 
 ![演示](./preview.png)
 
 ## 特点
 
-- **不用指定形状**：圆角自动读元素的 CSS `border-radius`，胶囊 / 圆形自动识别；
+- **不用指定形状**：圆角自动读元素的 CSS `border-radius`，胶囊 / 圆形自动识别；  
   元素本身（文字、图标、事件、动画）保持 DOM 原样，画布只在它背后画同形状的玻璃。
-- **文字会被玻璃折射**（`refractText`，默认开）：元素里的文字会被当成「场景内容」
-  交给渲染器绘制，于是玻璃采样场景时会把文字一起折射 / 模糊 / 拉伸 —— 看得见字在玻璃
-  里面，而不是浮在玻璃上面的贴纸。关掉它（`refractText: false`）就回到
-  「DOM 文字永远清晰、压在玻璃之上」的老行为。
-- **默认预设「通透」**：`blur: 0`（原版玻璃游乐场的初始值就是不糊）+ 强折射带 +
-  1px 高光描边 + 投影。玻璃的"存在感"来自边缘的折射/高光，而不是把背景糊白。
+- **文字会被玻璃折射**（`refractText`，默认开）：元素里的文字会被当成「场景内容」交给渲染器绘制，于是玻璃采样场景时会把文字一起折射 / 模糊 / 拉伸 —— 看得见字在玻璃里面，而不是浮在玻璃上面的贴纸。关掉它（`refractText: false`）就回到「DOM 文字永远清晰、压在玻璃之上」的老行为。
+- **默认预设「通透」**：`blur: 0`（原版玻璃游乐场的初始值就是不糊）+ 强折射带 + 1px 高光描边 + 投影。玻璃的"存在感"来自边缘的折射/高光，而不是把背景糊白。
 - **动画**（都走原仓库的弹簧与渲染器能力）：
   - **入场动画**：0→1 弹簧，淡入 + 从 0.9 弹到 1 + 轻微上浮，`enterStagger` 按注册顺序错峰；
-  - **按压动画**：`interactive: true` 的元素按原仓库 `button` 处理 —— 按下玻璃放大 `1+4/48`、
-    手指处出现白色辉光、跟手位移（tanh）、松手欠阻尼回弹；
+  - **按压动画**：`interactive: true` 的元素按原仓库 `button` 处理 —— 按下玻璃放大 `1+4/48`、手指处出现白色辉光、跟手位移（tanh）、松手欠阻尼回弹；
   - 拖动 / 滚动 / 改参数每帧同步，静止时自动休眠。
-- **预设**：`clear`（通透，默认）/ `liquid`（液态）/ `frosted`（磨砂）/ `heavy`（厚重）/ `chromatic`（色散），
-  一句 `glass.setPreset('liquid')` 全局换，也可以只换一个元素。
-- **自由调参**（就是原版「玻璃游乐场」的那套参数）：
-  圆角、模糊、折射宽度、折射强度、不透明度、色散、纵深折射、染色、表面色、
-  饱和度 / 亮度 / 对比度、边缘高光（模式 / 强度 / 角度 / 宽度）、投影、旋转、缩放。
-- **玻璃叠玻璃**：`independentBackdrop: false` 时玻璃采样合成后的场景，
-  后面的玻璃会折射前面的玻璃（默认 `true`：只采样壁纸，更通透也更快）。
+- **预设**：`clear`（通透，默认）/ `liquid`（液态）/ `frosted`（磨砂）/ `heavy`（厚重）/ `chromatic`（色散），一句 `glass.setPreset('liquid')` 全局换，也可以只换一个元素。
+- **自由调参**（就是原版「玻璃游乐场」的那套参数）：  
+  圆角、模糊、折射宽度、折射强度、不透明度、色散、纵深折射、染色、表面色、饱和度 / 亮度 / 对比度、边缘高光（模式 / 强度 / 角度 / 宽度）、投影、旋转、缩放。
+- **玻璃叠玻璃**：`independentBackdrop: false` 时玻璃采样合成后的场景，后面的玻璃会折射前面的玻璃（默认 `true`：只采样壁纸，更通透也更快）。
 - **实时**：拖动滑杆 / 移动元素 / 滚动页面都能立刻跟上；无变化时渲染器自动空转休眠。
 - 原版渲染器的全套能力都在（Kawase 模糊、每元素 FBO、模糊缓存、DPR / 降采样档位…）。
-
-## 目录
-
-```
-liquid-glass/
-├── src/
-│   ├── renderer/ shaders/ shapes/   ← 原仓库代码，原样复制（未改动）
-│   ├── host.ts                      ← 新增：vanilla 宿主
-│   └── index.ts                     ← 新增：入口
-├── dist/
-│   ├── liquid-glass.js              ← 直接用这个（IIFE，window.LiquidGlass）
-│   ├── liquid-glass.min.js          ← 压缩版
-│   └── liquid-glass.esm.js          ← ESM 版
-├── index.html                       ← 演示 + 玻璃游乐场（所有控件都是普通 DOM）
-├── examples/minimal.html            ← 最小示例
-├── build.mjs / package.json         ← 重新打包：npm i && npm run build
-├── NOTICE.md                        ← 来源、授权、哪些是复制的哪些是新增的
-├── LICENSE                          ← Apache-2.0
-└── README.md
-```
 
 ## 快速开始
 
@@ -165,9 +276,8 @@ import { LiquidGlass } from './dist/liquid-glass.esm.js';
 | `capsuleShape` | `false` | 用 G2 连续曲率 SDF 纹理做形状（更精确，但每个尺寸一张纹理） |
 | `independentBackdrop` | `true` | `true` = 只采样壁纸（通透、可缓存、快）；`false` = 采样场景（可以玻璃叠玻璃） |
 
-> 折射参数有「绝对值」和「比例」两套：`refractionAmount: 40` 是写死 40px；
-> `refractionAmountFraction: 0.42` 是 `0.42 × min(w,h)`，大卡片和小胶囊观感一致 ——
-> 原版玻璃游乐场用的就是比例。两个都给时绝对值优先。
+> 折射参数有「绝对值」和「比例」两套：`refractionAmount: 40` 是写死 40px；  
+> `refractionAmountFraction: 0.42` 是 `0.42 × min(w,h)`，大卡片和小胶囊观感一致 —— 原版玻璃游乐场用的就是比例。两个都给时绝对值优先。
 
 ### 壁纸
 
@@ -195,7 +305,7 @@ glass.setPreset('liquid');                 // 全部元素
 glass.setPreset('frosted', '#card');       // 只换卡片
 ```
 
-预设只是「一组观感参数」，`update()` / `setParam()` 里显式给的值优先级更高
+预设只是「一组观感参数」，`update()` / `setParam()` 里显式给的值优先级更高  
 （顺序：默认值 → 预设 → 全局显式覆盖 → 元素自己的参数）。
 
 ## 文字折射（沉浸模式）
@@ -206,30 +316,18 @@ glass.updateAll({ refractText: false });
 glass.update('#panel', { refractText: false });       // 只让某块玻璃的字保持清晰
 ```
 
-它是怎么做的：宿主用 `Range.getClientRects()` 把元素里的文字按**浏览器自己的行盒**切出来，
-逐行生成原仓库 `catalog` 里那种 `kind: 'text'` 元素，放进场景的**最底层**（在所有玻璃之前），
-然后把 DOM 里的那份文字设成透明（只改颜色，文字仍在 DOM 里，选中 / 复制 / 读屏都不受影响）。
-玻璃在这之后就采样场景，于是文字跟着壁纸一起被折射。
+它是怎么做的：宿主用 `Range.getClientRects()` 把元素里的文字按**浏览器自己的行盒**切出来，逐行生成原仓库 `catalog` 里那种 `kind: 'text'` 元素，放进场景的**最底层**（在所有玻璃之前），然后把 DOM 里的那份文字设成透明（只改颜色，文字仍在 DOM 里，选中 / 复制 / 读屏都不受影响）。玻璃在这之后就采样场景，于是文字跟着壁纸一起被折射。
 
 代价与边界（都写在 `NOTICE.md` 里）：
 
-- 可见的那份文字由渲染器的 Canvas2D 栅格化，字体栈是上游写死的那一套
-  （`-apple-system, …, Arial, sans-serif`）—— 页面的 CSS 字体请尽量与之一致，
-  否则字形会有一点点不同；
-- 文字折射开启时玻璃必须采样「场景」，不能只采样壁纸（只采样壁纸会把底下的文字盖掉），
-  所以会放弃一部分缓存加速；
+- 可见的那份文字由渲染器的 Canvas2D 栅格化，字体栈是上游写死的那一套（`-apple-system, …, Arial, sans-serif`）—— 页面的 CSS 字体请尽量与之一致，否则字形会有一点点不同；
+- 文字折射开启时玻璃必须采样「场景」，不能只采样壁纸（只采样壁纸会把底下的文字盖掉），所以会放弃一部分缓存加速；
 - 表单控件（`button` / `input` / `select` / `option`）里的文字不接管，保持浏览器原生渲染；
-- 比画布还高的元素（超长面板）建议 `refractText: false`：渲染器的每元素 FBO 会碰到
-  尺寸边界，文字可能被画歪；面板这类控件保持 DOM 原生文字反而更清楚；
-- 折射带宽度是 `fraction × min(w,h)/2`：一块铺满整屏的大玻璃会得到非常宽的折射带，
-  把里面的内容搅烂。大背景板请用很小的 fraction（或绝对 px），并给它 `keepLook: true`，
-  免得被全局滑杆/预设改掉；
-- 旋转过的元素（`rotation ≠ 0`）和 `scale < 1`（玻璃比文字小一圈）保留 DOM 文字，
-  因为行盒 / 尺寸对不上会产生重影；
-- 采样方式会自动选：**盖住文字的玻璃**采样场景（这样字才能透过玻璃被折射），
-  没盖住文字的玻璃继续"只采样壁纸"（更通透、更快，也不会被上一层玻璃的模糊糊掉）；
-- 玻璃开了 `blur` 时文字会跟着糊 —— 这正是「雾面玻璃盖住内容」该有的样子；
-  想看清字就把这块玻璃的 `blur` 调到 0（默认预设「通透」就是 0）。
+- 比画布还高的元素（超长面板）建议 `refractText: false`：渲染器的每元素 FBO 会碰到尺寸边界，文字可能被画歪；面板这类控件保持 DOM 原生文字反而更清楚；
+- 折射带宽度是 `fraction × min(w,h)/2`：一块铺满整屏的大玻璃会得到非常宽的折射带，把里面的内容搅烂。大背景板请用很小的 fraction（或绝对 px），并给它 `keepLook: true`，免得被全局滑杆/预设改掉；
+- 旋转过的元素（`rotation ≠ 0`）和 `scale < 1`（玻璃比文字小一圈）保留 DOM 文字，因为行盒 / 尺寸对不上会产生重影；
+- 采样方式会自动选：**盖住文字的玻璃**采样场景（这样字才能透过玻璃被折射），没盖住文字的玻璃继续"只采样壁纸"（更通透、更快，也不会被上一层玻璃的模糊糊掉）；
+- 玻璃开了 `blur` 时文字会跟着糊 —— 这正是「雾面玻璃盖住内容」该有的样子；想看清字就把这块玻璃的 `blur` 调到 0（默认预设「通透」就是 0）。
 
 ## 动画
 
@@ -245,12 +343,8 @@ glass.update('#ball', { interactive: true });  // 让某个元素可按压
 glass.press('#ball', true, { x: 300, y: 200 }); // 脚本触发按压（不点鼠标也行）
 ```
 
-- 入场：宿主每帧推进一个弹簧（ω≈15.5、ζ≈0.74），把值喂给渲染器的 `enterProgress`，
-  同时乘进 `elementScaleX/Y`；`enterStagger` 让同一批登记的元素依次进场。
-- 按压：`interactive` 默认为 `true`，所以**任何**登记过的元素（按钮、卡片、面板、方块…）
-  按下去都有反馈。DOM 事件在 `document` 捕获阶段统一监听 →
-  `renderer.setPressed()/setDragPosition()`，之后的弹簧、辉光、跟手位移、回弹
-  全部是原仓库渲染器自己的代码。
+- 入场：宿主每帧推进一个弹簧（ω≈15.5、ζ≈0.74），把值喂给渲染器的 `enterProgress`，同时乘进 `elementScaleX/Y`；`enterStagger` 让同一批登记的元素依次进场。
+- 按压：`interactive` 默认为 `true`，所以**任何**登记过的元素（按钮、卡片、面板、方块…）按下去都有反馈。DOM 事件在 `document` 捕获阶段统一监听 → `renderer.setPressed()/setDragPosition()`，之后的弹簧、辉光、跟手位移、回弹全部是原仓库渲染器自己的代码。
 - 文字元素和玻璃元素共用同一套入场数值，所以进场过程中字不会跟玻璃错位。
 
 ## 玻璃游乐场（`index.html`）
@@ -264,8 +358,7 @@ glass.press('#ball', true, { x: 300, y: 200 }); // 脚本触发按压（不点�
 
 ## 小贴士：去掉点击时的虚线框
 
-浏览器默认的焦点框（Firefox 的点线、某些场景下的虚线）画在玻璃上特别显眼。库本身
-**不注入**任何 `outline` 规则 —— 那会伤键盘可访问性 —— 需要的话在自己的页面里加：
+浏览器默认的焦点框（Firefox 的点线、某些场景下的虚线）画在玻璃上特别显眼。库本身**不注入**任何 `outline` 规则 —— 那会伤键盘可访问性 —— 需要的话在自己的页面里加：
 
 ```css
 button, input, select, a, [data-liquid-glass] {
@@ -279,8 +372,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 ```
 
-演示页里的「选中某个控件」反馈也换成不带边框的做法了：点一下扩散并淡出的一圈柔光环
-（`.sel` + `lg-sel-pulse` 动画），不再常驻虚线。
+演示页里的「选中某个控件」反馈也换成不带边框的做法了：点一下扩散并淡出的一圈柔光环（`.sel` + `lg-sel-pulse` 动画），不再常驻虚线。
 
 ## 性能
 
