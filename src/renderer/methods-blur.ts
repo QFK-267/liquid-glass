@@ -176,31 +176,38 @@ export const blurMethods = {
     radius: number, tapCount: number, glassMode: boolean,
   ): WebGLTexture {
     const gl = this.gl
+    // PERFORMANCE: prog/state/draw micro-timing (10 performance.now() calls
+    // per blur pair) only matters to the backdrop-cache miss path in
+    // methods-render-glass-backdrop.ts, which pre-seeds lastBlurStats before
+    // calling us and reads progMs/stateMs/drawMs back afterwards. Every other
+    // caller (highlight mask, plain bbox blurs, scene blur) never consumes
+    // those fields, so we skip all instrumentation when lastBlurStats is null
+    // — on some drivers each performance.now() also flushes pending GPU work,
+    // turning free timing probes into real frame hitches.
+    const timed = this.lastBlurStats !== null
     // Program ensure: first call compiles+links the shader (expensive, ~5-20ms);
-    // subsequent calls are a Map lookup (cheap, <0.01ms). Timed separately so
-    // the overlay can distinguish one-time compile cost from per-frame state
-    // overhead.
-    const tProg0 = performance.now()
+    // subsequent calls are a Map lookup (cheap, <0.01ms).
+    const tProg0 = timed ? performance.now() : 0
     if (glassMode) {
       this.ensureBlurPrograms(tapCount)
     } else {
       this.ensureHighlightBlurPrograms(tapCount)
     }
     const entry = (glassMode ? this.blurPrograms : this.highlightBlurPrograms).get(tapCount)!
-    const tProg1 = performance.now()
+    const tProg1 = timed ? performance.now() : 0
     // State save: getParameter × 3 (FRAMEBUFFER_BINDING, SCISSOR_TEST enable,
     // SCISSOR_BOX) + disable scissor + disable blend. Each getParameter is a
     // driver round-trip; restore at the end reverses them.
-    const tState0 = performance.now()
+    const tState0 = timed ? performance.now() : 0
     const savedFb = gl.getParameter(gl.FRAMEBUFFER_BINDING)
     const savedScissor = gl.isEnabled(gl.SCISSOR_TEST)
     const savedBox: [number, number, number, number] = gl.getParameter(gl.SCISSOR_BOX)
     gl.disable(gl.SCISSOR_TEST)
     gl.disable(gl.BLEND)
-    const tState1 = performance.now()
+    const tState1 = timed ? performance.now() : 0
 
     // Pass 1: horizontal — srcTex → dstFboA.
-    const tH0 = performance.now()
+    const tH0 = timed ? performance.now() : 0
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstFboA)
     gl.viewport(0, 0, w, h)
     gl.useProgram(entry.hProg)
